@@ -86,13 +86,25 @@ module lcd_formatter #(
     wire [6:0] AH = to_bin(alm_h), AM = to_bin(alm_m), AS = to_bin(alm_s);
     wire [6:0] TH = to_bin(tmr_h), TM = to_bin(tmr_m), TS = to_bin(tmr_s);
 
-    // ======================= 알람까지 남은 시간 (분 단위) =======================
-    wire [11:0] now_min  = H  * 12'd60 + M;
-    wire [11:0] alm_min  = AH * 12'd60 + AM;
-    wire [11:0] left_min = (alm_min > now_min) ? (alm_min - now_min)
-                                               : (alm_min + 12'd1440 - now_min);
-    wire [6:0]  left_h   = left_min / 60;
-    wire [6:0]  left_m   = left_min % 60;
+    // ======================= 알람까지 남은 시간 (초 단위) =======================
+
+    // 현재 시각을 초 단위로 변환
+    wire [16:0] now_sec =
+        H * 17'd3600 + M * 17'd60 + S;
+
+    // 알람 시각을 초 단위로 변환
+    wire [16:0] alm_sec =
+        AH * 17'd3600 + AM * 17'd60 + AS;
+
+    // 알람까지 남은 시간 (다음 날까지 고려)
+    wire [16:0] left_total_sec =
+        (alm_sec > now_sec) ? (alm_sec - now_sec)
+                            : (alm_sec + 17'd86400 - now_sec);
+
+    // 남은 시간을 시:분:초로 분리
+    wire [6:0] left_h = left_total_sec / 3600;
+    wire [6:0] left_m = (left_total_sec % 3600) / 60;
+    wire [6:0] left_s = left_total_sec % 60;
 
     // ======================= 깜빡임 =======================
     wire set_mode = (mode == MODE_CLK_SET) || (mode == MODE_ALM_SET) || (mode == MODE_TMR_SET);
@@ -183,7 +195,7 @@ module lcd_formatter #(
         end else if (show_on) begin
             if (alm_on) begin
                 line1 = {"NEXT AL ", aH, ":", aM, ":", aS};
-                line2 = {"IN ", d2(left_h), "h ", d2(left_m), "m      "};
+                line2 = {"IN ", d2(left_h), ":", d2(left_m), ":", d2(left_s), "     "};
             end else begin
                 line1 = "NO ALARM SET    ";
                 line2 = "                ";
